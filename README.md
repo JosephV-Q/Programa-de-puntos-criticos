@@ -25,7 +25,6 @@ El motor de simulación es determinista y demostrativo. No es un análisis FEM p
 - Una base PostgreSQL accesible. Neon es la base de producción prevista.
 - `psycopg` para conectar SQLAlchemy con PostgreSQL.
 
-Docker, Docker Compose, MySQL y SQLite no son necesarios ni forman parte del flujo de ejecución.
 
 ## Configuración
 
