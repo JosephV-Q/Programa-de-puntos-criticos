@@ -56,6 +56,8 @@ alembic upgrade head
 
 La migración inicial crea `users`, `structural_models` y `simulations`, con UUID, claves foráneas, índices, correo único, fechas con zona horaria y resultados `JSONB`.
 
+La migración inicial ya fue aplicada y verificada contra la instancia Neon configurada para este proyecto.
+
 Para generar una nueva migración después de cambiar los modelos:
 
 ```powershell
