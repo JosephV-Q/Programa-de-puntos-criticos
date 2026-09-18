@@ -1,5 +1,23 @@
 from app.schemas import SimulationParameters, StructuralModel
+from app.services.ai_service import analyze_simulation
 from app.services.simulation_service import run_simulation
+
+
+def test_ai_analysis_identifies_critical_zones_and_priorities():
+    result = run_simulation(
+        StructuralModel(name="Puente Central", length=120, width=9, height=18, material="concreto"),
+        SimulationParameters(excitation="seismic", intensity=0.9, modes=5),
+    )
+
+    analysis = analyze_simulation(result)
+
+    assert analysis.overall_risk in {"low", "medium", "high", "critical"}
+    assert analysis.critical_zone_count >= 1
+    assert analysis.priority_zones
+    assert analysis.monitoring_recommendations
+    assert analysis.plan_3d is not None
+    assert analysis.plan_3d.generated is True
+    assert any(item.priority == "Alta" for item in analysis.priority_zones)
 
 
 def test_simulation_returns_critical_zones_and_monitoring_points():

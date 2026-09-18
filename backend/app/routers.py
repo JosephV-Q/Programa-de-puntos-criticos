@@ -17,6 +17,7 @@ from app.schemas import (
     StructuralModel,
     StructuralModelResponse,
 )
+from app.services.ai_service import analyze_simulation
 from app.services.simulation_service import run_simulation
 
 router = APIRouter(prefix="/api", tags=["simulaciones"])
@@ -37,17 +38,22 @@ def create_simulation(
     database: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "structural_engineer")),
 ) -> SimulationResult:
-    model_record = StructuralModelRecord(
-        owner_id=user.id,
-        name=request.model.name,
-        length=request.model.length,
-        width=request.model.width,
-        height=request.model.height,
-        material=request.model.material,
+    model_record = database.get(StructuralModelRecord, request.model_id) if request.model_id else None
+    if model_record is not None and model_record.owner_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modelo no encontrado")
+    if model_record is None:
+        model_record = StructuralModelRecord(owner_id=user.id, **request.model.model_dump())
+        database.add(model_record)
+        database.flush()
+    simulation_model = StructuralModel(
+        name=model_record.name,
+        length=model_record.length,
+        width=model_record.width,
+        height=model_record.height,
+        material=model_record.material,
     )
-    database.add(model_record)
-    database.flush()
-    result = run_simulation(request.model, request.parameters)
+    result = run_simulation(simulation_model, request.parameters)
+    result.ai_analysis = analyze_simulation(result)
     database.add(
         SimulationRecord(
             id=result.simulation_id,
@@ -89,7 +95,9 @@ def list_models(
     database: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[StructuralModelRecord]:
-    query = select(StructuralModelRecord).where(StructuralModelRecord.owner_id == user.id)
+    query = select(StructuralModelRecord)
+    if user.role != "instrumentation_specialist":
+        query = query.where(StructuralModelRecord.owner_id == user.id)
     return list(database.scalars(query.order_by(StructuralModelRecord.created_at.desc())).all())
 
 
@@ -101,9 +109,10 @@ def list_simulations(
     query = (
         select(SimulationRecord, StructuralModelRecord.name)
         .join(StructuralModelRecord, SimulationRecord.model_id == StructuralModelRecord.id)
-        .where(SimulationRecord.owner_id == user.id)
         .order_by(SimulationRecord.created_at.desc())
     )
+    if user.role != "instrumentation_specialist":
+        query = query.where(SimulationRecord.owner_id == user.id)
     return [
         SimulationSummary(
             simulation_id=record.id,
@@ -127,7 +136,7 @@ def get_simulation(
     user: User = Depends(get_current_user),
 ) -> SimulationResult:
     record = database.get(SimulationRecord, simulation_id)
-    if record is None or record.owner_id != user.id:
+    if record is None or (record.owner_id != user.id and user.role != "instrumentation_specialist"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulación no encontrada")
     model = database.get(StructuralModelRecord, record.model_id)
     if model is None:
@@ -157,7 +166,7 @@ def export_simulation(
     user: User = Depends(get_current_user),
 ) -> Response:
     record = database.get(SimulationRecord, simulation_id)
-    if record is None or record.owner_id != user.id:
+    if record is None or (record.owner_id != user.id and user.role != "instrumentation_specialist"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulación no encontrada")
     payload = {
         "simulation_id": record.id,

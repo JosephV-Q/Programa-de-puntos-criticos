@@ -21,6 +21,7 @@ class SimulationParameters(BaseModel):
 class SimulationRequest(BaseModel):
     model: StructuralModel
     parameters: SimulationParameters
+    model_id: str | None = None
 
 
 class StructuralModelResponse(StructuralModel):
@@ -45,6 +46,41 @@ class MonitoringPoint(BaseModel):
     priority: Literal["recommended", "high"]
 
 
+class AIZonePriority(BaseModel):
+    zone_label: str
+    position: float = Field(ge=0, le=1)
+    severity: Literal["low", "medium", "high", "critical"]
+    priority: Literal["Baja", "Media", "Alta", "Crítica"]
+    reason: str
+
+
+class AIMonitoringRecommendation(BaseModel):
+    zone_label: str
+    position: float = Field(ge=0, le=1)
+    priority: Literal["Baja", "Media", "Alta", "Crítica"]
+    recommended_sensors: int
+    reason: str
+
+
+class AIPlan3D(BaseModel):
+    generated: bool
+    title: str
+    summary: str
+    hotspot_zones: list[str]
+    sensor_positions: list[float]
+    camera_position: list[float]
+
+
+class AIAnalysis(BaseModel):
+    overall_risk: Literal["low", "medium", "high", "critical"]
+    critical_zone_count: int
+    summary: str
+    priority_zones: list[AIZonePriority]
+    monitoring_recommendations: list[AIMonitoringRecommendation]
+    recommended_actions: list[str]
+    plan_3d: AIPlan3D | None = None
+
+
 class SimulationResult(BaseModel):
     simulation_id: str
     model: StructuralModel
@@ -53,6 +89,7 @@ class SimulationResult(BaseModel):
     peak_acceleration: float
     zones: list[CriticalZone]
     monitoring_points: list[MonitoringPoint]
+    ai_analysis: AIAnalysis | None = None
 
 
 class SimulationStatus(BaseModel):
